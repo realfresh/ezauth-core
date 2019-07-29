@@ -1,3 +1,4 @@
+"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -6,11 +7,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import jwt from "jsonwebtoken";
-import faker from "faker";
-import nanoid from "nanoid";
-import { MongoClient } from "mongodb";
-import EzAuth, { EzAuthMongoDBAdapter } from "..";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const faker_1 = __importDefault(require("faker"));
+const nanoid_1 = __importDefault(require("nanoid"));
+const mongodb_1 = require("mongodb");
+const __1 = __importStar(require(".."));
 require("dotenv").config({
     path: ".env.test",
 });
@@ -26,22 +38,22 @@ describe("EZAUTH TESTS", () => {
     let db;
     let auth;
     beforeAll(() => __awaiter(this, void 0, void 0, function* () {
-        connection = yield MongoClient.connect(MONGO_URL, {
+        connection = yield mongodb_1.MongoClient.connect(MONGO_URL, {
             useNewUrlParser: true,
         });
         db = yield connection.db(MONGO_DATABASE);
         const users = db.collection(MONGO_COLLECTION);
         yield users.deleteMany({});
-        const dbAdapter = yield EzAuthMongoDBAdapter({ db, collection: MONGO_COLLECTION });
-        auth = new EzAuth({
+        const dbAdapter = yield __1.EzAuthMongoDBAdapter({ db, collection: MONGO_COLLECTION });
+        auth = new __1.default({
             tokenSecretKey: SECRET_KEY,
-            generateId: () => nanoid(),
-            generateLoginState: () => nanoid(),
+            generateId: () => nanoid_1.default(),
+            generateLoginState: () => nanoid_1.default(),
             generateLoginCode: () => Math.floor(100000 + Math.random() * 900000).toString(),
             generateLoginCodeExpiry: () => Date.now() + (1000 * 60 * 10),
-            generatePasswordResetCode: () => nanoid(),
+            generatePasswordResetCode: () => nanoid_1.default(),
             generatePasswordExpiry: () => Date.now() + (1000 * 60 * 60),
-            generateVerificationCode: () => nanoid(),
+            generateVerificationCode: () => nanoid_1.default(),
             generateVerificationCodeExpiry: () => Date.now() + (1000 * 60 * 60),
             db: dbAdapter,
         });
@@ -50,7 +62,7 @@ describe("EZAUTH TESTS", () => {
         yield connection.close();
     }));
     it("USER REGISTER - NO PASSWORD", () => __awaiter(this, void 0, void 0, function* () {
-        const email = faker.internet.email();
+        const email = faker_1.default.internet.email();
         const { user } = yield auth.register({
             type: "email",
             login: email,
@@ -64,7 +76,7 @@ describe("EZAUTH TESTS", () => {
         expect(user.profile).toEqual({});
     }));
     it("USER REGISTER - PASSWORD", () => __awaiter(this, void 0, void 0, function* () {
-        const email = faker.internet.email();
+        const email = faker_1.default.internet.email();
         const { user } = yield auth.register({
             type: "email",
             login: email,
@@ -79,7 +91,7 @@ describe("EZAUTH TESTS", () => {
         expect(user.profile).toEqual({});
     }));
     it("USER REGISTER - ALREADY EXISTS", () => __awaiter(this, void 0, void 0, function* () {
-        const email = faker.internet.email();
+        const email = faker_1.default.internet.email();
         yield auth.register({
             type: "email",
             login: email,
@@ -92,7 +104,7 @@ describe("EZAUTH TESTS", () => {
         })).rejects.toEqual({ code: auth.errors.user_already_exists });
     }));
     it("USER PASSWORD LOGIN - CORRECT", () => __awaiter(this, void 0, void 0, function* () {
-        const email = faker.internet.email();
+        const email = faker_1.default.internet.email();
         yield auth.register({
             type: "email",
             login: email,
@@ -103,13 +115,13 @@ describe("EZAUTH TESTS", () => {
             password: "123123",
         });
         expect(() => {
-            jwt.verify(token, "wrong-secret");
+            jsonwebtoken_1.default.verify(token, "wrong-secret");
         }).toThrow();
         const { user } = yield auth.tokenVerify({ token });
         expect(user.login).toEqual(email);
     }));
     it("USER PASSWORD LOGIN - INCORRECT", () => __awaiter(this, void 0, void 0, function* () {
-        const email = faker.internet.email();
+        const email = faker_1.default.internet.email();
         yield auth.register({
             type: "email",
             login: email,
@@ -123,7 +135,7 @@ describe("EZAUTH TESTS", () => {
         });
     }));
     it("USER PASSWORD LOGIN - NO PASSWORD", () => __awaiter(this, void 0, void 0, function* () {
-        const email = faker.internet.email();
+        const email = faker_1.default.internet.email();
         yield auth.register({
             type: "email",
             login: email,
@@ -136,7 +148,7 @@ describe("EZAUTH TESTS", () => {
         });
     }));
     it("USER PASSWORD LOGIN - DOESNT EXIST", () => __awaiter(this, void 0, void 0, function* () {
-        const email = faker.internet.email();
+        const email = faker_1.default.internet.email();
         yield expect(auth.loginPassword({
             login: email,
             password: "321321",
@@ -193,7 +205,7 @@ describe("EZAUTH TESTS", () => {
         expect(user.verified).toEqual(true);
     }));
     it("USER REVOKE LOGIN", () => __awaiter(this, void 0, void 0, function* () {
-        const login = faker.internet.email();
+        const login = faker_1.default.internet.email();
         yield auth.register({
             type: "email",
             login: login,
@@ -212,7 +224,7 @@ describe("EZAUTH TESTS", () => {
     }));
     it("USER RESET PASSWORD", () => __awaiter(this, void 0, void 0, function* () {
         jest.setTimeout(10000);
-        const login = faker.internet.email();
+        const login = faker_1.default.internet.email();
         const { user } = yield auth.register({
             type: "email",
             login: login,
@@ -235,8 +247,8 @@ describe("EZAUTH TESTS", () => {
         expect(updatedUser.password).not.toEqual(user.password);
     }));
     it("USER UPDATE LOGIN", () => __awaiter(this, void 0, void 0, function* () {
-        const login = faker.internet.email();
-        const newLogin = faker.internet.email();
+        const login = faker_1.default.internet.email();
+        const newLogin = faker_1.default.internet.email();
         const password = "123123";
         yield auth.register({
             type: "email",
@@ -263,7 +275,7 @@ describe("EZAUTH TESTS", () => {
     it("USER UPDATE PROFILE", () => __awaiter(this, void 0, void 0, function* () {
         const login = "cpatarun@gmail.com";
         const profile = {
-            organisation_id: nanoid(),
+            organisation_id: nanoid_1.default(),
         };
         const user = yield auth.db.userFindByLogin(login);
         yield auth.updateProfile({ login, profile });
@@ -272,7 +284,7 @@ describe("EZAUTH TESTS", () => {
         expect(user.profile).not.toEqual(updatedUser.profile);
     }));
     it("USER REMOVE", () => __awaiter(this, void 0, void 0, function* () {
-        const login = faker.internet.email();
+        const login = faker_1.default.internet.email();
         yield auth.register({
             type: "email",
             login: login,

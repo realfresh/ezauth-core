@@ -1,0 +1,43 @@
+export declare class EzAuth {
+    errors: {
+        user_already_exists: string;
+        user_not_found: string;
+        user_no_password: string;
+        user_incorrect_password: string;
+        user_incorrect_login_type: string;
+        user_login_code_inactive: string;
+        user_login_code_incorrect: string;
+        user_login_code_expired: string;
+        user_login_state_invalid: string;
+        user_token_invalid: string;
+        user_password_reset_inactive: string;
+        user_password_reset_incorrect: string;
+        user_password_reset_expired: string;
+        user_incorrect_type: string;
+        user_verification_inactive: string;
+        user_verification_incorrect: string;
+        user_verification_expired: string;
+        user_verification_incorrect_type: string;
+    };
+    opts: EzAuthOptions;
+    constructor(opts: EzAuthOptions);
+    readonly db: EzAuthDBAdapter;
+    register: (opts: EzAuthRegisterOpts) => Promise<EzAuthRegisterResult>;
+    loginPassword: ({ login, password }: EzAuthLoginPasswordOpts) => Promise<EzAuthLoginPasswordResult>;
+    loginEmailInit: ({ login }: EzAuthLoginEmailInitOpts) => Promise<EzAuthLoginEmailInitResult>;
+    loginEmailComplete: ({ login, loginCode }: EzAuthLoginEmailCompleteOpts) => Promise<EzAuthLoginEmailCompleteResult>;
+    tokenVerify: ({ token }: EzAuthTokenVerifyOpts) => Promise<EzAuthTokenVerifyResult>;
+    tokenRevoke: ({ login }: EzAuthTokenRevokeOpts) => Promise<EzAuthTokenRevokeResult>;
+    resetPasswordInit: ({ login }: EzAuthPasswordResetInitOpts) => Promise<EzAuthPasswordResetInitResult>;
+    resetPasswordComplete: ({ login, password, passwordResetCode }: EzAuthPasswordResetCompleteOpts) => Promise<EzAuthPasswordResetCompleteResult>;
+    updateLogin: ({ login, newLogin }: EzAuthUpdateLoginOpts) => Promise<EzAuthUpdateLoginResult>;
+    updatePassword: ({ login, password }: EzAuthUpdatePasswordOpts) => Promise<EzAuthUpdatePasswordResult>;
+    updateProfile: ({ login, profile }: EzAuthUpdateProfileOpts) => Promise<EzAuthUpdateProfileResult>;
+    removeUser: ({ login }: EzAuthUserRemoveOpts) => Promise<EzAuthUserRemoveResult>;
+    emailVerificationInit: ({ login }: EzAuthEmailVerificationInitOpts) => Promise<EzAuthEmailVerificationInitResult>;
+    emailVerificationComplete: ({ login, verificationCode }: EzAuthEmailVerificationCompleteOpts) => Promise<EzAuthEmailVerificationCompleteResult>;
+    private tokenVerifyBasic;
+    private tokenGenerate;
+    private userMakeSafe;
+    private hashPassword;
+}

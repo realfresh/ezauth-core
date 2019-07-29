@@ -1,3 +1,4 @@
+"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -6,9 +7,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-export class EzAuth {
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const bcrypt_1 = __importDefault(require("bcrypt"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+class EzAuth {
     constructor(opts) {
         this.errors = {
             user_already_exists: "user_already_exists",
@@ -71,7 +76,7 @@ export class EzAuth {
             if (!user.password) {
                 throw { code: this.errors.user_no_password };
             }
-            if (!bcrypt.compareSync(password, user.password)) {
+            if (!bcrypt_1.default.compareSync(password, user.password)) {
                 throw { code: this.errors.user_incorrect_password };
             }
             const token = this.tokenGenerate(user);
@@ -270,11 +275,11 @@ export class EzAuth {
             };
         });
         this.tokenVerifyBasic = (token) => {
-            return jwt.verify(token, this.opts.tokenSecretKey);
+            return jsonwebtoken_1.default.verify(token, this.opts.tokenSecretKey);
         };
         this.tokenGenerate = (user) => {
             this.userMakeSafe(user);
-            return jwt.sign(user, this.opts.tokenSecretKey, {
+            return jsonwebtoken_1.default.sign(user, this.opts.tokenSecretKey, {
                 expiresIn: this.opts.tokenExpiry || "1h",
             });
         };
@@ -285,7 +290,7 @@ export class EzAuth {
             return user;
         };
         this.hashPassword = (password) => {
-            return bcrypt.hashSync(password, this.opts.passwordSaltRounds || 12);
+            return bcrypt_1.default.hashSync(password, this.opts.passwordSaltRounds || 12);
         };
         this.opts = opts;
     }
@@ -293,4 +298,5 @@ export class EzAuth {
         return this.opts.db;
     }
 }
+exports.EzAuth = EzAuth;
 //# sourceMappingURL=index.js.map

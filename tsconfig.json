@@ -6,6 +6,7 @@
         "outDir": "./dist",
         "sourceMap": true,
         "inlineSources": true,
+        "declaration": true,
 
         /* MODULES */
         "module": "commonjs",
@@ -44,7 +45,8 @@
         "./src/**/*"
     ],
     "exclude": [
-        "node_modules"
+        "node_modules",
+        "dist"
     ]
     
 }
