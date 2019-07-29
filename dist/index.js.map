@@ -1,1 +1,0 @@
-{"version":3,"file":"index.js","sourceRoot":"","sources":["../src/index.ts"],"names":[],"mappings":";;AAAA,iCAAgC;AAChC,6CAAyD;AAEhD,+BAFA,4BAAoB,CAEA;AAE7B,kBAAe,aAAM,CAAC","sourcesContent":["import { EzAuth } from \"./core\";\nimport { EzAuthMongoDBAdapter } from \"./databases/mongo\";\n\nexport { EzAuthMongoDBAdapter };\n\nexport default EzAuth;\n"]}
