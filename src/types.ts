@@ -1,16 +1,16 @@
 
 // BASE
-interface EzAuthSuccess {
+export interface EzAuthSuccess {
   outcome: 0;
 }
-interface EzAuthError {
+export interface EzAuthError {
   outcome: 1;
   error: string;
 }
 
 // EZ AUTH DB
-type LoginTypes = "username" | "email" | "phone";
-interface EzAuthUser {
+export type LoginTypes = "username" | "email" | "phone";
+export interface EzAuthUser {
   _id: string;
   created: number;
   type: LoginTypes;
@@ -21,7 +21,7 @@ interface EzAuthUser {
     [key: string]: any;
   };
 }
-interface EzAuthUserDB extends EzAuthUser {
+export interface EzAuthUserDB extends EzAuthUser {
   login_code: string | null;
   login_code_expiry: number | null;
   password: string | null;
@@ -33,7 +33,7 @@ interface EzAuthUserDB extends EzAuthUser {
 
 // EZ AUTH CONFIG
 
-interface EzAuthDBAdapter {
+export interface EzAuthDBAdapter {
   userInsert: (user: EzAuthUserDB) => Promise<void>;
   userFindById: (id: string) => Promise<EzAuthUserDB | null>;
   userFindByLogin: (login: string) => Promise<EzAuthUserDB | null>;
@@ -42,7 +42,7 @@ interface EzAuthDBAdapter {
   userRemove: (login: string) => Promise<void>;
 }
 
-interface EzAuthOptions {
+export interface EzAuthOptions {
   tokenSecretKey: string;
   tokenExpiry?: number;
   passwordSaltRounds?: number;
@@ -59,7 +59,7 @@ interface EzAuthOptions {
 
 // EZ AUTH FUNCTIONS
 
-interface EzAuthRegisterOpts {
+export interface EzAuthRegisterOpts {
   type: LoginTypes;
   login: string;
   password?: string;
@@ -67,97 +67,97 @@ interface EzAuthRegisterOpts {
   verified?: boolean;
   generateVerificationCode?: boolean;
 }
-interface EzAuthRegisterResult {
+export interface EzAuthRegisterResult {
   user: EzAuthUserDB;
 }
 
-interface EzAuthLoginPasswordOpts {
+export interface EzAuthLoginPasswordOpts {
   login: string;
   password: string;
 }
-interface EzAuthLoginPasswordResult {
+export interface EzAuthLoginPasswordResult {
   token: string;
 }
 
-interface EzAuthLoginEmailInitOpts {
+export interface EzAuthLoginEmailInitOpts {
   login: string;
 }
-interface EzAuthLoginEmailInitResult {
+export interface EzAuthLoginEmailInitResult {
   loginCode: string;
   loginCodeExpiry: number;
 }
 
-interface EzAuthLoginEmailCompleteOpts {
+export interface EzAuthLoginEmailCompleteOpts {
   login: string;
   loginCode: string;
 }
-interface EzAuthLoginEmailCompleteResult {
+export interface EzAuthLoginEmailCompleteResult {
   token: string;
 }
 
-interface EzAuthTokenVerifyOpts {
+export interface EzAuthTokenVerifyOpts {
   token: string;
 }
-interface EzAuthTokenVerifyResult {
+export interface EzAuthTokenVerifyResult {
   user: EzAuthUserDB;
 }
 
-interface EzAuthTokenRevokeOpts {
+export interface EzAuthTokenRevokeOpts {
   login: string;
 }
-interface EzAuthTokenRevokeResult {}
+export interface EzAuthTokenRevokeResult {}
 
-interface EzAuthPasswordResetInitOpts {
+export interface EzAuthPasswordResetInitOpts {
   login: string;
 }
-interface EzAuthPasswordResetInitResult {
+export interface EzAuthPasswordResetInitResult {
   passwordResetCode: string;
   passwordResetCodeExpiry: number;
 }
 
-interface EzAuthPasswordResetCompleteOpts {
+export interface EzAuthPasswordResetCompleteOpts {
   login: string;
   password: string;
   passwordResetCode: string;
 }
-interface EzAuthPasswordResetCompleteResult {}
+export interface EzAuthPasswordResetCompleteResult {}
 
-interface EzAuthUpdateLoginOpts {
+export interface EzAuthUpdateLoginOpts {
   login: string;
   newLogin: string;
 }
-interface EzAuthUpdateLoginResult {}
+export interface EzAuthUpdateLoginResult {}
 
-interface EzAuthUpdatePasswordOpts {
+export interface EzAuthUpdatePasswordOpts {
   login: string;
   password: string;
 }
-interface EzAuthUpdatePasswordResult {}
+export interface EzAuthUpdatePasswordResult {}
 
-interface EzAuthUpdateProfileOpts {
+export interface EzAuthUpdateProfileOpts {
   login: string;
   profile: EzAuthUser["profile"];
 }
-interface EzAuthUpdateProfileResult {
+export interface EzAuthUpdateProfileResult {
   profile: EzAuthUser["profile"];
 }
 
-interface EzAuthUserRemoveOpts {
+export interface EzAuthUserRemoveOpts {
   login: string;
 }
-interface EzAuthUserRemoveResult {}
+export interface EzAuthUserRemoveResult {}
 
-interface EzAuthEmailVerificationInitOpts {
+export interface EzAuthEmailVerificationInitOpts {
   login: string;
 }
 
-interface EzAuthEmailVerificationInitResult {
+export interface EzAuthEmailVerificationInitResult {
   verificationCode: string;
   verificationCodeExpiry: number;
 }
 
-interface EzAuthEmailVerificationCompleteOpts {
+export interface EzAuthEmailVerificationCompleteOpts {
   login: string;
   verificationCode: string;
 }
-interface EzAuthEmailVerificationCompleteResult {}
+export interface EzAuthEmailVerificationCompleteResult {}

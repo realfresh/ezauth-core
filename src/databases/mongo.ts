@@ -1,4 +1,5 @@
 import {Db} from "mongodb";
+import {EzAuthDBAdapter} from "../types";
 
 interface EzAuthMongoDBAdapterOptions {
   collection: string;

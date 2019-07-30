@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import * as T from "../types";
 
 export class EzAuth {
 
@@ -24,9 +25,9 @@ export class EzAuth {
     user_verification_incorrect_type: "user_verification_incorrect_type",
   };
 
-  opts: EzAuthOptions;
+  opts: T.EzAuthOptions;
 
-  constructor(opts: EzAuthOptions) {
+  constructor(opts: T.EzAuthOptions) {
     this.opts = opts;
   }
   
@@ -34,7 +35,7 @@ export class EzAuth {
     return this.opts.db;
   }
   
-  register = async (opts: EzAuthRegisterOpts): Promise<EzAuthRegisterResult> => {
+  register = async (opts: T.EzAuthRegisterOpts): Promise<T.EzAuthRegisterResult> => {
     
     const existing = await this.db.userFindByLogin(opts.login);
 
@@ -42,7 +43,7 @@ export class EzAuth {
       throw { code: this.errors.user_already_exists };
     }
 
-    const user: EzAuthUserDB = {
+    const user: T.EzAuthUserDB = {
       _id: this.opts.generateId(),
       created: Date.now(),
       type: opts.type,
@@ -76,7 +77,7 @@ export class EzAuth {
 
   }
 
-  loginPassword = async ({ login, password }: EzAuthLoginPasswordOpts): Promise<EzAuthLoginPasswordResult> => {
+  loginPassword = async ({ login, password }: T.EzAuthLoginPasswordOpts): Promise<T.EzAuthLoginPasswordResult> => {
 
     const user = await this.db.userFindByLogin(login);
 
@@ -100,7 +101,7 @@ export class EzAuth {
 
   }
 
-  loginEmailInit = async ({ login }: EzAuthLoginEmailInitOpts): Promise<EzAuthLoginEmailInitResult> => {
+  loginEmailInit = async ({ login }: T.EzAuthLoginEmailInitOpts): Promise<T.EzAuthLoginEmailInitResult> => {
 
     const user = await this.db.userFindByLogin(login);
 
@@ -127,7 +128,7 @@ export class EzAuth {
 
   }
 
-  loginEmailComplete = async ({ login, loginCode }: EzAuthLoginEmailCompleteOpts): Promise<EzAuthLoginEmailCompleteResult> => {
+  loginEmailComplete = async ({ login, loginCode }: T.EzAuthLoginEmailCompleteOpts): Promise<T.EzAuthLoginEmailCompleteResult> => {
 
     const user = await this.db.userFindByLogin(login);
 
@@ -160,7 +161,7 @@ export class EzAuth {
 
   }
 
-  tokenVerify = async ({ token }: EzAuthTokenVerifyOpts): Promise<EzAuthTokenVerifyResult> => {
+  tokenVerify = async ({ token }: T.EzAuthTokenVerifyOpts): Promise<T.EzAuthTokenVerifyResult> => {
 
     let decoded;
     try {
@@ -186,7 +187,7 @@ export class EzAuth {
 
   }
 
-  tokenRevoke = async ({ login }: EzAuthTokenRevokeOpts): Promise<EzAuthTokenRevokeResult> => {
+  tokenRevoke = async ({ login }: T.EzAuthTokenRevokeOpts): Promise<T.EzAuthTokenRevokeResult> => {
 
     await this.db.userUpdateByLogin(login, {
       login_state: this.opts.generateLoginState(),
@@ -196,7 +197,7 @@ export class EzAuth {
 
   }
   
-  resetPasswordInit = async ({ login }: EzAuthPasswordResetInitOpts): Promise<EzAuthPasswordResetInitResult> => {
+  resetPasswordInit = async ({ login }: T.EzAuthPasswordResetInitOpts): Promise<T.EzAuthPasswordResetInitResult> => {
 
     const user = await this.db.userFindByLogin(login);
 
@@ -219,7 +220,7 @@ export class EzAuth {
 
   }
 
-  resetPasswordComplete = async ({ login, password, passwordResetCode }: EzAuthPasswordResetCompleteOpts): Promise<EzAuthPasswordResetCompleteResult> => {
+  resetPasswordComplete = async ({ login, password, passwordResetCode }: T.EzAuthPasswordResetCompleteOpts): Promise<T.EzAuthPasswordResetCompleteResult> => {
 
     const user = await this.db.userFindByLogin(login);
 
@@ -251,7 +252,7 @@ export class EzAuth {
 
   }
 
-  updateLogin = async ({ login, newLogin }: EzAuthUpdateLoginOpts): Promise<EzAuthUpdateLoginResult> => {
+  updateLogin = async ({ login, newLogin }: T.EzAuthUpdateLoginOpts): Promise<T.EzAuthUpdateLoginResult> => {
 
     const existing = await this.db.userFindByLogin(newLogin);
 
@@ -271,7 +272,7 @@ export class EzAuth {
 
   }
 
-  updatePassword = async ({ login, password }: EzAuthUpdatePasswordOpts): Promise<EzAuthUpdatePasswordResult> => {
+  updatePassword = async ({ login, password }: T.EzAuthUpdatePasswordOpts): Promise<T.EzAuthUpdatePasswordResult> => {
 
     await this.db.userUpdateByLogin(login, {
       password: this.hashPassword(password),
@@ -284,7 +285,7 @@ export class EzAuth {
 
   }
 
-  updateProfile = async ({ login, profile }: EzAuthUpdateProfileOpts): Promise<EzAuthUpdateProfileResult> => {
+  updateProfile = async ({ login, profile }: T.EzAuthUpdateProfileOpts): Promise<T.EzAuthUpdateProfileResult> => {
 
     const user = await this.db.userFindByLogin(login);
 
@@ -307,7 +308,7 @@ export class EzAuth {
 
   }
 
-  removeUser =  async ({ login }: EzAuthUserRemoveOpts): Promise<EzAuthUserRemoveResult> => {
+  removeUser =  async ({ login }: T.EzAuthUserRemoveOpts): Promise<T.EzAuthUserRemoveResult> => {
 
     await this.db.userRemove(login);
 
@@ -317,7 +318,7 @@ export class EzAuth {
 
   }
 
-  emailVerificationInit = async ({ login }: EzAuthEmailVerificationInitOpts): Promise<EzAuthEmailVerificationInitResult> => {
+  emailVerificationInit = async ({ login }: T.EzAuthEmailVerificationInitOpts): Promise<T.EzAuthEmailVerificationInitResult> => {
 
     const user = await this.db.userFindByLogin(login);
 
@@ -344,7 +345,7 @@ export class EzAuth {
 
   }
 
-  emailVerificationComplete = async ({ login, verificationCode }: EzAuthEmailVerificationCompleteOpts): Promise<EzAuthEmailVerificationCompleteResult> => {
+  emailVerificationComplete = async ({ login, verificationCode }: T.EzAuthEmailVerificationCompleteOpts): Promise<T.EzAuthEmailVerificationCompleteResult> => {
 
     const user = await this.db.userFindByLogin(login);
 
@@ -376,18 +377,18 @@ export class EzAuth {
 
   }
 
-  private tokenVerifyBasic = (token: string): EzAuthUser => {
-    return jwt.verify(token, this.opts.tokenSecretKey) as EzAuthUser;
+  private tokenVerifyBasic = (token: string): T.EzAuthUser => {
+    return jwt.verify(token, this.opts.tokenSecretKey) as T.EzAuthUser;
   }
 
-  private tokenGenerate = (user: EzAuthUserDB) => {
+  private tokenGenerate = (user: T.EzAuthUserDB) => {
     this.userMakeSafe(user);
     return jwt.sign(user, this.opts.tokenSecretKey, {
       expiresIn: this.opts.tokenExpiry || "1h",
     });
   }
 
-  private userMakeSafe = (user: EzAuthUserDB): EzAuthUser => {
+  private userMakeSafe = (user: T.EzAuthUserDB): T.EzAuthUser => {
     delete user.password;
     delete user.login_code;
     delete user.login_code_expiry;
