@@ -32,19 +32,11 @@ describe("EZAUTH TESTS", () => {
 
     const users = db.collection(MONGO_COLLECTION);
     await users.deleteMany({});
-    
+
     const dbAdapter = await EzAuthMongoDBAdapter({ db, collection: MONGO_COLLECTION });
 
     auth = new EzAuth({
       tokenSecretKey: SECRET_KEY,
-      generateId: () => nanoid(),
-      generateLoginState: () => nanoid(),
-      generateLoginCode: () => Math.floor(100000 + Math.random() * 900000).toString(),
-      generateLoginCodeExpiry: () => Date.now() + (1000 * 60 * 10),
-      generatePasswordResetCode: () => nanoid(),
-      generatePasswordExpiry: () => Date.now() + (1000 * 60 * 60),
-      generateVerificationCode: () => nanoid(),
-      generateVerificationCodeExpiry: () => Date.now() + (1000 * 60 * 60),
       db: dbAdapter,
     });
 
@@ -54,75 +46,146 @@ describe("EZAUTH TESTS", () => {
     await connection.close();
   });
 
+  // MONGO ADAPTER
+
   // REGISTRATION
-  it("USER REGISTER - NO PASSWORD", async () => {
+  it("REGISTER - NO PASSWORD", async () => {
 
     const email = faker.internet.email();
 
     const { user } = await auth.register({
-      type: "email",
-      login: email,
+      email: email,
     });
 
     expect(typeof user._id).toEqual("string");
     expect(typeof user.created).toEqual("number");
-    expect(user.type).toEqual("email");
-    expect(user.login).toEqual(email);
-    expect(typeof user.login_state).toEqual("string");
+    expect(user.username).toEqual(undefined);
+    expect(user.email).toEqual(email);
+    expect(user.phone).toEqual(undefined);
+    expect(typeof user.auth_state).toEqual("string");
     expect(user.password).toEqual(null);
-    expect(user.profile).toEqual({});
+    expect(user.data).toEqual({});
 
   });
-  it("USER REGISTER - PASSWORD", async () => {
+  it("REGISTER - PASSWORD", async () => {
 
     const email = faker.internet.email();
 
     const { user } = await auth.register({
-      type: "email",
-      login: email,
+      email: email,
       password: "123123",
     });
 
     expect(typeof user._id).toEqual("string");
     expect(typeof user.created).toEqual("number");
-    expect(user.type).toEqual("email");
-    expect(user.login).toEqual(email);
-    expect(typeof user.login_state).toEqual("string");
+    expect(user.username).toEqual(undefined);
+    expect(user.email).toEqual(email);
+    expect(user.phone).toEqual(undefined);
+    expect(typeof user.auth_state).toEqual("string");
     expect(typeof user.password).toEqual("string");
-    expect(user.profile).toEqual({});
+    expect(user.data).toEqual({});
 
   });
-  it("USER REGISTER - ALREADY EXISTS", async () => {
+  it("REGISTER - MULTI ACCOUNT", async () => {
 
+    const username = faker.internet.email();
     const email = faker.internet.email();
+    const phone = faker.phone.phoneNumber();
+    const password = "123123";
+
+    const { user } = await auth.register({ username, email, phone, password });
+
+    expect(user.username).toEqual(username);
+    expect(user.email).toEqual(email);
+    expect(user.phone).toEqual(phone);
+
+    await auth.loginPassword({ username, password });
+    await auth.loginPassword({ email, password });
+    await auth.loginPassword({ phone, password });
+
+  });
+  it("REGISTER - IDENTIFIER CONFLICTS", async () => {
+
+    jest.setTimeout(10000);
+
+    const justEmail = faker.internet.email();
 
     await auth.register({
-      type: "email",
-      login: email,
+      email: justEmail,
       password: "123123",
     });
 
     await expect(auth.register({
-      type: "email",
-      login: email,
-      password: "123123",
-    })).rejects.toEqual({ code: auth.errors.user_already_exists });
+      email: justEmail,
+    })).rejects.toEqual({ code: auth.errors.register_already_exists });
+
+    const first = {
+      username: faker.internet.userName(),
+      email: faker.internet.email(),
+      phone: faker.phone.phoneNumber(),
+    };
+    const second = {
+      username: faker.internet.userName(),
+      phone: faker.phone.phoneNumber(),
+    };
+    const third = {
+      email: faker.internet.email(),
+      phone: faker.phone.phoneNumber(),
+    };
+    const fourth = {
+      phone: faker.phone.phoneNumber(),
+    };
+
+    await auth.register(first);
+    await auth.register(second);
+    await auth.register(third);
+    await auth.register(fourth);
+
+    await expect(auth.register(first)).rejects.toEqual({ code: auth.errors.register_already_exists });
+    await expect(auth.register(second)).rejects.toEqual({ code: auth.errors.register_already_exists });
+    await expect(auth.register(third)).rejects.toEqual({ code: auth.errors.register_already_exists });
+    await expect(auth.register(fourth)).rejects.toEqual({ code: auth.errors.register_already_exists });
+
+    await expect(auth.register({
+      username: first.username,
+      phone: fourth.phone,
+    })).rejects.toEqual({ code: auth.errors.register_already_exists });
+
+    await expect(auth.register({
+      username: first.username,
+    })).rejects.toEqual({ code: auth.errors.register_already_exists });
+
+    await expect(auth.register({
+      email: third.email,
+    })).rejects.toEqual({ code: auth.errors.register_already_exists });
+
+    await expect(auth.register({
+      phone: second.phone,
+    })).rejects.toEqual({ code: auth.errors.register_already_exists });
 
   });
 
   // LOGIN PASSWORD
-  it("USER PASSWORD LOGIN - CORRECT", async () => {
+  it("PASSWORD LOGIN", async () => {
 
     const email = faker.internet.email();
 
     await auth.register({
-      type: "email",
-      login: email,
+      email: email,
       password: "123123",
     });
 
+    // WRONG PASSWORD
+    await expect(auth.loginPassword({
+      email: email,
+      password: "321321",
+    })).rejects.toEqual({
+      code: auth.errors.login_password_incorrect,
+    });
+
+    // CORRECT PASSWORD
     const { token } = await auth.loginPassword({
-      login: email,
+      email: email,
       password: "123123",
     });
 
@@ -130,52 +193,31 @@ describe("EZAUTH TESTS", () => {
       jwt.verify(token, "wrong-secret");
     }).toThrow();
 
-    const { user } = await auth.tokenVerify({ token });
+    const { decoded } = await auth.tokenVerify({ token });
 
-    expect(user.login).toEqual(email);
+    expect(decoded.email).toEqual(email);
 
   });
-  it("USER PASSWORD LOGIN - INCORRECT", async () => {
+  it("PASSWORD LOGIN - NO PASSWORD", async () => {
 
     const email = faker.internet.email();
 
-    await auth.register({
-      type: "email",
-      login: email,
-      password: "123123",
-    });
+    await auth.register({ email });
 
     await expect(auth.loginPassword({
-      login: email,
+      email: email,
       password: "321321",
     })).rejects.toEqual({
-      code: auth.errors.user_incorrect_password,
+      code: auth.errors.login_password_none,
     });
 
   });
-  it("USER PASSWORD LOGIN - NO PASSWORD", async () => {
-
-    const email = faker.internet.email();
-
-    await auth.register({
-      type: "email",
-      login: email,
-    });
-
-    await expect(auth.loginPassword({
-      login: email,
-      password: "321321",
-    })).rejects.toEqual({
-      code: auth.errors.user_no_password,
-    });
-
-  });
-  it("USER PASSWORD LOGIN - DOESNT EXIST", async () => {
+  it("PASSWORD LOGIN - USER DOESNT EXIST", async () => {
 
     const email = faker.internet.email();
 
     await expect(auth.loginPassword({
-      login: email,
+      email: email,
       password: "321321",
     })).rejects.toEqual({
       code: auth.errors.user_not_found,
@@ -183,225 +225,206 @@ describe("EZAUTH TESTS", () => {
 
   });
 
-  // LOGIN EMAIL
-  it("USER EMAIL LOGIN", async () => {
+  // TOKEN VALIDATION
+
+  // ADDITIONAL FUNCTIONS
+  it("CODE LOGIN", async () => {
 
     jest.setTimeout(10000);
 
-    const login = "cpatarun@gmail.com";
+    const email = "cpatarun@gmail.com";
 
-    await auth.register({
-      type: "email",
-      login: login,
-    });
+    await auth.register({ email });
 
     // TEST UNINITIALIZED
-    await expect(auth.loginEmailComplete({ login, loginCode: "" })).rejects.toEqual({
-      code: auth.errors.user_login_code_inactive,
+    await expect(auth.loginCodeComplete({ email, loginCode: "" })).rejects.toEqual({
+      code: auth.errors.login_code_inactive,
     });
 
     // INIT LOGIN
-    const { loginCode } = await auth.loginEmailInit({ login });
+    const { loginCode } = await auth.loginCodeInit({ email });
 
     // TEST INCORRECT CODE
-    await expect(auth.loginEmailComplete({ login, loginCode: "" })).rejects.toEqual({
-      code: auth.errors.user_login_code_incorrect,
+    await expect(auth.loginCodeComplete({ email, loginCode: "as213" })).rejects.toEqual({
+      code: auth.errors.login_code_incorrect,
     });
 
     // TEST CORRECT CODE & VERIFY TOKEN
-    const { token } = await auth.loginEmailComplete({ login, loginCode });
+    const { token } = await auth.loginCodeComplete({ email, loginCode });
 
-    const { user } = await auth.tokenVerify({ token });
+    const { decoded } = await auth.tokenVerify({ token });
 
-    expect(user.login).toEqual(login);
-
-  });
-  it("USER EMAIL LOGIN - WRONG TYPE", async () => {
-
-    const login = "+61466986992";
-
-    await auth.register({
-      type: "phone",
-      login: login,
-    });
-
-    await expect(auth.loginEmailInit({ login })).rejects.toEqual({
-      code: auth.errors.user_incorrect_login_type,
-    });
+    expect(decoded.email).toEqual(email);
 
   });
-
-  // EMAIL VERIFICATION
-  it("USER EMAIL VERIFICATION", async () => {
+  it("EMAIL VERIFICATION", async () => {
 
     jest.setTimeout(10000);
 
-    const login = "cpatarun@gmail.com";
+    const email = "cpatarun@gmail.com";
 
     // TEST INACTIVE
-    await expect(auth.emailVerificationComplete({
-      login: login,
-      verificationCode: "123123",
+    await expect(auth.verificationComplete({
+      email: email,
+      type: "email",
+      code: "123123",
     })).rejects.toEqual({
-      code: auth.errors.user_verification_inactive,
+      code: auth.errors.verification_inactive,
     });
 
     // INIT RESET
-    const { verificationCode } = await auth.emailVerificationInit({ login });
+    const { code } = await auth.verificationInit({ email });
 
     // TEST INCORRECT CODE
-    await expect(auth.emailVerificationComplete({
-      login: login,
-      verificationCode: "123123",
+    await expect(auth.verificationComplete({
+      email: email,
+      type: "email",
+      code: "123123",
     })).rejects.toEqual({
-      code: auth.errors.user_verification_incorrect,
+      code: auth.errors.verification_incorrect,
     });
 
     // TEST CORRECT CODE & VERIFY CHANGE
-    await auth.emailVerificationComplete({ login, verificationCode });
+    await auth.verificationComplete({ email, code, type: "email" });
 
-    const user = await auth.db.userFindByLogin(login);
+    const user = await auth.db.find({ email });
 
-    expect(user!.verified).toEqual(true);
+    expect(user!.email_verified).toEqual(true);
 
   });
+  it("REVOKE LOGIN", async () => {
 
-  // LOGIN REVOKE
-  it("USER REVOKE LOGIN", async () => {
+    const email = faker.internet.email();
+    const password = "123123";
 
-    const login = faker.internet.email();
+    await auth.register({ email, password });
 
-    await auth.register({
-      type: "email",
-      login: login,
-      password: "123123",
-    });
-
-    const { token } = await auth.loginPassword({
-      login: login,
-      password: "123123",
-    });
+    const { token } = await auth.loginPassword({ email, password });
 
     const { user } = await auth.tokenVerify({ token });
 
-    expect(user.login).toEqual(login);
+    expect(user.email).toEqual(email);
 
-    await auth.tokenRevoke({ login });
+    await auth.tokenRevoke({ email });
 
     await expect(auth.tokenVerify({ token })).rejects.toEqual({
-      code: auth.errors.user_login_state_invalid,
+      code: auth.errors.user_token_invalid,
     });
 
   });
-
-  // RESET PASSWORD
-  it("USER RESET PASSWORD", async () => {
+  it("RESET PASSWORD", async () => {
 
     jest.setTimeout(10000);
 
-    const login = faker.internet.email();
+    const email = faker.internet.email();
+    const password = "123123";
 
-    const { user } = await auth.register({
-      type: "email",
-      login: login,
+    const { user } = await auth.register({ email, password });
+
+    // TEST INACTIVE
+    await expect(auth.resetPasswordComplete({
+      email: email,
       password: "123123",
+      code: "abc123",
+    })).rejects.toEqual({
+      code: auth.errors.password_reset_inactive,
     });
 
     // INIT RESET
-    const { passwordResetCode } = await auth.resetPasswordInit({ login });
+    const { code } = await auth.resetPasswordInit({ email });
 
     // TEST INCORRECT CODE
     await expect(auth.resetPasswordComplete({
-      login: login,
+      email: email,
       password: "123123",
-      passwordResetCode: "",
+      code: "abc123",
     })).rejects.toEqual({
-      code: auth.errors.user_password_reset_incorrect,
+      code: auth.errors.password_reset_incorrect,
     });
 
     // TEST CORRECT CODE & VERIFY CHANGE
-    await auth.resetPasswordComplete({
-      login: login,
-      password: "123123",
-      passwordResetCode: passwordResetCode,
-    });
+    await auth.resetPasswordComplete({ email, password, code });
 
-    const updatedUser = await auth.db.userFindByLogin(login);
+    const updatedUser = await auth.db.find({ email });
 
     expect(updatedUser!.password).not.toEqual(user!.password);
 
   });
 
   // UPDATES & DELETION
-  it("USER UPDATE LOGIN", async () => {
+  it("UPDATE LOGIN", async () => {
 
-    const login = faker.internet.email();
-    const newLogin = faker.internet.email();
+    const email = faker.internet.email();
+    const newEmail = faker.internet.email();
+    const otherEmail = faker.internet.email();
     const password = "123123";
 
-    await auth.register({
-      type: "email",
-      login: login,
-      password: "123123",
-    });
+    await auth.register({ email, password });
 
-    await auth.updateLogin({ login, newLogin });
+    await auth.register({ email: otherEmail });
 
-    const { token } = await auth.loginPassword({
-      login: newLogin,
-      password: password,
-    });
+    // CHECK SAME EMAIL
+    await expect(auth.updateLogin({ email, newEmail: email })).rejects.toEqual({ code: auth.errors.update_login_already_exists });
 
-    const { user } = await auth.tokenVerify({ token });
+    // CHECK OTHER EMAIL
+    await expect(auth.updateLogin({ email, newEmail: otherEmail })).rejects.toEqual({ code: auth.errors.update_login_already_exists });
 
-    expect(user.login).toEqual(newLogin);
+    // UPDATE CORRECT
+    await auth.updateLogin({ email, newEmail });
+
+    const { token } = await auth.loginPassword({ email: newEmail, password });
+
+    const { decoded } = await auth.tokenVerify({ token });
+
+    expect(decoded.email).toEqual(newEmail);
 
   });
-  it("USER UPDATE PASSWORD", async () => {
+  it("UPDATE PASSWORD", async () => {
 
-    const login = "cpatarun@gmail.com";
+    const email = "cpatarun@gmail.com";
     const password = "123123";
 
-    const user = await auth.db.userFindByLogin(login);
+    const user = await auth.db.find({ email });
 
-    await auth.updatePassword({ login, password });
+    await auth.updatePassword({ email, password });
 
-    const updatedUser = await auth.db.userFindByLogin(login);
+    const updatedUser = await auth.db.find({ email });
 
     expect(user!.password).not.toEqual(updatedUser!.password);
-    expect(user!.login_state).not.toEqual(updatedUser!.login_state);
+    expect(user!.auth_state).not.toEqual(updatedUser!.auth_state);
 
   });
-  it("USER UPDATE PROFILE", async () => {
+  it("UPDATE DATA", async () => {
 
-    const login = "cpatarun@gmail.com";
+    const email = "cpatarun@gmail.com";
 
-    const profile = {
+    const data = {
       organisation_id: nanoid(),
     };
 
-    const user = await auth.db.userFindByLogin(login);
+    const user = await auth.db.find({ email });
 
-    await auth.updateProfile({ login, profile });
+    await auth.updateData({ email, data });
 
-    const updatedUser = await auth.db.userFindByLogin(login);
+    const updatedUser = await auth.db.find({ email });
 
-    expect(updatedUser!.profile).toEqual(profile);
-    expect(user!.profile).not.toEqual(updatedUser!.profile);
+    expect(updatedUser!.data).toEqual(data);
+    expect(user!.data).not.toEqual(updatedUser!.data);
 
   });
-  it("USER REMOVE", async () => {
+  it("REMOVE", async () => {
 
-    const login = faker.internet.email();
+    const email = faker.internet.email();
 
-    await auth.register({
-      type: "email",
-      login: login,
-    });
+    await auth.register({ email });
 
-    await auth.removeUser({ login });
+    const exists = await auth.db.find({ email });
 
-    const user = await auth.db.userFindByLogin(login);
+    expect(exists).not.toEqual(null);
+
+    await auth.removeUser({ email });
+
+    const user = await auth.db.find({ email });
 
     expect(user).toEqual(null);
 

@@ -1,55 +1,81 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import * as T from "../types";
+import nanoid from "nanoid";
 
 export class EzAuth {
 
-  errors = {
-    user_already_exists: "user_already_exists",
+  readonly errors = {
+    update_login_already_exists: "update_login_already_exists",
     user_not_found: "user_not_found",
-    user_no_password: "user_no_password",
-    user_incorrect_password: "user_incorrect_password",
-    user_incorrect_login_type: "user_incorrect_login_type",
-    user_login_code_inactive: "user_login_code_inactive",
-    user_login_code_incorrect: "user_login_code_incorrect",
-    user_login_code_expired: "user_login_code_expired",
-    user_login_state_invalid: "user_login_state_invalid",
+
+    register_missing_identifier: "register_missing_identifier",
+    register_already_exists: "register_already_exists",
+
+    login_password_none: "login_password_none",
+    login_password_incorrect: "user_incorrect_password",
+    login_code_inactive: "user_login_code_inactive",
+    login_code_incorrect: "user_login_code_incorrect",
+    login_code_expired: "user_login_code_expired",
+
+    user_auth_state_invalid: "user_auth_state_invalid",
     user_token_invalid: "user_token_invalid",
-    user_password_reset_inactive: "user_password_reset_inactive",
-    user_password_reset_incorrect: "user_password_reset_incorrect",
-    user_password_reset_expired: "user_password_reset_expired",
+
+    password_reset_inactive: "user_password_reset_inactive",
+    password_reset_incorrect: "user_password_reset_incorrect",
+    password_reset_expired: "user_password_reset_expired",
+
     user_incorrect_type: "user_incorrect_type",
-    user_verification_inactive: "user_verification_inactive",
-    user_verification_incorrect: "user_verification_incorrect",
-    user_verification_expired: "user_verification_expired",
-    user_verification_incorrect_type: "user_verification_incorrect_type",
+
+    verification_inactive: "user_verification_inactive",
+    verification_incorrect: "user_verification_incorrect",
+    verification_expired: "user_verification_expired",
   };
+  readonly opts: T.Options;
+  readonly generate: T.Generators;
+  readonly db: T.DBAdapter;
 
-  opts: T.EzAuthOptions;
+  constructor(opts: T.Options) {
 
-  constructor(opts: T.EzAuthOptions) {
     this.opts = opts;
-  }
-  
-  get db() {
-    return this.opts.db;
-  }
-  
-  register = async (opts: T.EzAuthRegisterOpts): Promise<T.EzAuthRegisterResult> => {
-    
-    const existing = await this.db.userFindByLogin(opts.login);
+    this.db = opts.db;
+    this.generate = {
+      userId: () => nanoid(),
+      authState: () => nanoid(),
+      loginCode: () => Math.floor(100000 + Math.random() * 900000).toString(),
+      loginCodeExpiry: () => Date.now() + (1000 * 60 * 10),
+      passwordResetCode: () => nanoid(),
+      passwordResetCodeExpiry: () => Date.now() + (1000 * 60 * 60),
+      verificationCode: () => nanoid(),
+      verificationCodeExpiry: () => Date.now() + (1000 * 60 * 60),
+      ...opts.generate,
+    };
 
-    if (existing) {
-      throw { code: this.errors.user_already_exists };
+  }
+  
+  register = async (opts: T.RegisterOpts): Promise<T.RegisterResult> => {
+
+    const { username, email, phone } = opts;
+
+    if (!username && !email && !phone) {
+      throw { code: this.errors.register_missing_identifier };
     }
 
-    const user: T.EzAuthUserDB = {
-      _id: this.opts.generateId(),
+    const existing = await this.db.find({ username, email, phone }, true);
+
+    if (existing) {
+      throw { code: this.errors.register_already_exists };
+    }
+
+    const user: T.User = {
+      _id: this.generate.userId(),
       created: Date.now(),
-      type: opts.type,
-      login: opts.login,
-      login_state: this.opts.generateId(),
-      verified: opts.verified || false,
+      auth_state: this.generate.authState(),
+      username: username,
+      email: email,
+      phone: phone,
+      email_verified: false,
+      phone_verified: false,
       login_code: null,
       login_code_expiry: null,
       password: null,
@@ -57,7 +83,7 @@ export class EzAuth {
       password_reset_code_expiry: null,
       verification_code: null,
       verification_code_expiry: null,
-      profile: opts.profile || {},
+      data: opts.data || {},
     };
 
     if (opts.password) {
@@ -65,11 +91,11 @@ export class EzAuth {
     }
 
     if (opts.generateVerificationCode) {
-      user.verification_code = this.opts.generateVerificationCode();
-      user.verification_code_expiry = this.opts.generateVerificationCodeExpiry();
+      user.verification_code = this.generate.verificationCode();
+      user.verification_code_expiry = this.generate.verificationCodeExpiry();
     }
 
-    await this.db.userInsert(user);
+    await this.db.insert(user);
 
     return {
       user: user,
@@ -77,20 +103,26 @@ export class EzAuth {
 
   }
 
-  loginPassword = async ({ login, password }: T.EzAuthLoginPasswordOpts): Promise<T.EzAuthLoginPasswordResult> => {
+  loginPassword = async (opts: T.LoginPasswordOpts): Promise<T.LoginPasswordResult> => {
 
-    const user = await this.db.userFindByLogin(login);
+    const { password } = opts;
+
+    const query = this.queryFromOpts(opts);
+
+    const user = await this.db.find(query);
 
     if (!user) {
       throw { code: this.errors.user_not_found };
     }
 
     if (!user.password) {
-      throw { code: this.errors.user_no_password };
+      throw { code: this.errors.login_password_none };
     }
 
-    if (!bcrypt.compareSync(password, user.password)) {
-      throw { code: this.errors.user_incorrect_password };
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      throw { code: this.errors.login_password_incorrect };
     }
 
     const token = this.tokenGenerate(user);
@@ -101,25 +133,29 @@ export class EzAuth {
 
   }
 
-  loginEmailInit = async ({ login }: T.EzAuthLoginEmailInitOpts): Promise<T.EzAuthLoginEmailInitResult> => {
+  loginCodeInit = async (opts: T.LoginEmailInitOpts): Promise<T.LoginEmailInitResult> => {
 
-    const user = await this.db.userFindByLogin(login);
+    const { send } = opts;
+
+    const query = this.queryFromOpts(opts);
+
+    const user = await this.db.find(query);
 
     if (!user) {
       throw { code: this.errors.user_not_found };
     }
 
-    if (user.type !== "email") {
-      throw { code: this.errors.user_incorrect_login_type };
-    }
+    const loginCode = this.generate.loginCode();
+    const loginCodeExpiry = this.generate.loginCodeExpiry();
 
-    const loginCode = this.opts.generateLoginCode();
-    const loginCodeExpiry = this.opts.generateLoginCodeExpiry();
-
-    await this.db.userUpdateById(user._id, {
+    await this.db.update({ _id: user._id }, {
       login_code: loginCode,
       login_code_expiry: loginCodeExpiry,
     });
+
+    if (send && this.opts.sendLoginCode) {
+      await this.opts.sendLoginCode(user, loginCode, loginCodeExpiry);
+    }
 
     return {
       loginCode: loginCode,
@@ -128,27 +164,31 @@ export class EzAuth {
 
   }
 
-  loginEmailComplete = async ({ login, loginCode }: T.EzAuthLoginEmailCompleteOpts): Promise<T.EzAuthLoginEmailCompleteResult> => {
+  loginCodeComplete = async (opts: T.LoginEmailCompleteOpts): Promise<T.LoginEmailCompleteResult> => {
 
-    const user = await this.db.userFindByLogin(login);
+    const { loginCode } = opts;
+
+    const query = this.queryFromOpts(opts);
+
+    const user = await this.db.find(query);
 
     if (!user) {
       throw { code: this.errors.user_not_found };
     }
 
     if (user.login_code === null) {
-      throw { code: this.errors.user_login_code_inactive };
+      throw { code: this.errors.login_code_inactive };
     }
 
     if (user.login_code_expiry === null || Date.now() > user.login_code_expiry) {
-      throw { code: this.errors.user_login_code_expired };
+      throw { code: this.errors.login_code_expired };
     }
 
     if (user.login_code !== loginCode) {
-      throw { code: this.errors.user_login_code_incorrect };
+      throw { code: this.errors.login_code_incorrect };
     }
 
-    await this.db.userUpdateById(user._id, {
+    await this.db.update({ _id: user._id }, {
       login_code: null,
       login_code_expiry: null,
     });
@@ -161,7 +201,7 @@ export class EzAuth {
 
   }
 
-  tokenVerify = async ({ token }: T.EzAuthTokenVerifyOpts): Promise<T.EzAuthTokenVerifyResult> => {
+  tokenVerify = async ({ token }: T.TokenVerifyOpts): Promise<T.TokenVerifyResult> => {
 
     let decoded;
     try {
@@ -171,228 +211,258 @@ export class EzAuth {
       throw { code: this.errors.user_token_invalid };
     }
 
-    const user = await this.db.userFindById(decoded._id);
+    const user = await this.db.find({ _id: decoded.sub });
 
     if (!user) {
       throw { code: this.errors.user_not_found };
     }
 
-    if (user.login_state !== decoded.login_state) {
-      throw { code: this.errors.user_login_state_invalid };
+    if (user.auth_state !== decoded.auth_state) {
+      throw { code: this.errors.user_token_invalid };
     }
 
     return {
       user: user,
+      decoded: decoded,
     };
 
   }
 
-  tokenRevoke = async ({ login }: T.EzAuthTokenRevokeOpts): Promise<T.EzAuthTokenRevokeResult> => {
+  tokenRevoke = async (opts: T.TokenRevokeOpts): Promise<T.TokenRevokeResult> => {
 
-    await this.db.userUpdateByLogin(login, {
-      login_state: this.opts.generateLoginState(),
+    const query = this.queryFromOpts(opts);
+
+    await this.db.update(query, {
+      auth_state: this.generate.authState(),
     });
 
-    return { outcome: 0 };
+    return {};
 
   }
   
-  resetPasswordInit = async ({ login }: T.EzAuthPasswordResetInitOpts): Promise<T.EzAuthPasswordResetInitResult> => {
+  resetPasswordInit = async (opts: T.PasswordResetInitOpts): Promise<T.PasswordResetInitResult> => {
 
-    const user = await this.db.userFindByLogin(login);
+    const code = this.generate.passwordResetCode();
+    const expiry = this.generate.passwordResetCodeExpiry();
 
-    if (!user) {
-      throw { code: this.errors.user_not_found };
-    }
+    const query = this.queryFromOpts(opts);
 
-    const passwordResetCode = this.opts.generatePasswordResetCode();
-    const passwordResetCodeExpiry = this.opts.generatePasswordExpiry();
-
-    await this.db.userUpdateById(user._id, {
-      password_reset_code: passwordResetCode,
-      password_reset_code_expiry: passwordResetCodeExpiry,
+    await this.db.update(query, {
+      password_reset_code: code,
+      password_reset_code_expiry: expiry,
     });
 
-    return {
-      passwordResetCode: passwordResetCode,
-      passwordResetCodeExpiry: passwordResetCodeExpiry,
-    };
+    return { code, expiry };
 
   }
 
-  resetPasswordComplete = async ({ login, password, passwordResetCode }: T.EzAuthPasswordResetCompleteOpts): Promise<T.EzAuthPasswordResetCompleteResult> => {
+  resetPasswordComplete = async (opts: T.PasswordResetCompleteOpts): Promise<T.PasswordResetCompleteResult> => {
 
-    const user = await this.db.userFindByLogin(login);
+    const { password, code } = opts;
+
+    const query = this.queryFromOpts(opts);
+
+    const user = await this.db.find(query);
 
     if (!user) {
       throw { code: this.errors.user_not_found };
     }
 
     if (user.password_reset_code === null) {
-      throw { code: this.errors.user_login_code_inactive };
+      throw { code: this.errors.password_reset_inactive };
     }
 
     if (user.password_reset_code_expiry === null || Date.now() > user.password_reset_code_expiry) {
-      throw { code: this.errors.user_password_reset_expired };
+      throw { code: this.errors.password_reset_expired };
     }
 
-    if (user.password_reset_code !== passwordResetCode) {
-      throw { code: this.errors.user_password_reset_incorrect };
+    if (user.password_reset_code !== code) {
+      throw { code: this.errors.password_reset_incorrect };
     }
 
-    await this.db.userUpdateById(user._id, {
+    await this.db.update(query, {
       password: this.hashPassword(password),
       password_reset_code: null,
       password_reset_code_expiry: null,
     });
 
-    return {
-      outcome: 0,
-    };
+    return {};
 
   }
 
-  updateLogin = async ({ login, newLogin }: T.EzAuthUpdateLoginOpts): Promise<T.EzAuthUpdateLoginResult> => {
+  updateLogin = async (opts: T.UpdateLoginOpts): Promise<T.UpdateLoginResult> => {
 
-    const existing = await this.db.userFindByLogin(newLogin);
+    const query = this.queryFromOpts(opts);
+    const checkQuery: T.UserQuery = {};
+    const update: Partial<T.User> = {};
+
+    if (opts.newUsername) {
+      checkQuery.username = opts.newUsername;
+      update.username = opts.newUsername;
+    }
+    if (opts.newEmail) {
+      checkQuery.email = opts.newEmail;
+      update.email = opts.newEmail;
+    }
+    if (opts.newPhone) {
+      checkQuery.phone = opts.newPhone;
+      update.phone = opts.phone;
+    }
+
+    const existing = await this.db.find(checkQuery, true);
 
     if (existing) {
-      return {
-        outcome: 1,
-        error: this.errors.user_already_exists,
-      };
+      throw { code: this.errors.update_login_already_exists };
     }
 
-    await this.db.userUpdateByLogin(login, {
-      login: newLogin,
-      login_state: this.opts.generateLoginState(),
-    });
+    await this.db.update(query, update);
 
-    return { outcome: 0 };
+    return {};
 
   }
 
-  updatePassword = async ({ login, password }: T.EzAuthUpdatePasswordOpts): Promise<T.EzAuthUpdatePasswordResult> => {
+  updatePassword = async (opts: T.UpdatePasswordOpts): Promise<T.UpdatePasswordResult> => {
 
-    await this.db.userUpdateByLogin(login, {
-      password: this.hashPassword(password),
-      login_state: this.opts.generateLoginState(),
+    const query = this.queryFromOpts(opts);
+
+    await this.db.update(query, {
+      password: this.hashPassword(opts.password),
+      auth_state: this.generate.authState(),
     });
 
-    return {
-      outcome: 0,
-    };
+    return {};
 
   }
 
-  updateProfile = async ({ login, profile }: T.EzAuthUpdateProfileOpts): Promise<T.EzAuthUpdateProfileResult> => {
+  updateData = async (opts: T.UpdateDataOpts): Promise<T.UpdateDataResult> => {
 
-    const user = await this.db.userFindByLogin(login);
+    const query = this.queryFromOpts(opts);
+
+    const user = await this.db.find(query);
 
     if (!user) {
       throw { code: this.errors.user_not_found };
     }
 
-    const newProfile = {
-      ...(user.profile || {}),
-      ...(profile || {}),
+    const data = {
+      ...(user.data || {}),
+      ...(opts.data || {}),
     };
 
-    await this.db.userUpdateByLogin(login, {
-      profile: newProfile,
-    });
+    await this.db.update({ _id: user._id }, { data });
 
-    return {
-      profile: newProfile,
-    };
+    return { data };
 
   }
 
-  removeUser =  async ({ login }: T.EzAuthUserRemoveOpts): Promise<T.EzAuthUserRemoveResult> => {
+  removeUser =  async (opts: T.UserRemoveOpts): Promise<T.UserRemoveResult> => {
 
-    await this.db.userRemove(login);
+    const query = this.queryFromOpts(opts);
 
-    return {
-      outcome: 0,
-    };
+    await this.db.remove(query);
+
+    return {};
 
   }
 
-  emailVerificationInit = async ({ login }: T.EzAuthEmailVerificationInitOpts): Promise<T.EzAuthEmailVerificationInitResult> => {
+  verificationInit = async (opts: T.VerificationInitOpts): Promise<T.VerificationInitResult> => {
 
-    const user = await this.db.userFindByLogin(login);
+    const query = this.queryFromOpts(opts);
+
+    const user = await this.db.find(query);
 
     if (!user) {
       throw { code: this.errors.user_not_found };
     }
 
-    if (user.type !== "email") {
-      throw { code: this.errors.user_incorrect_type };
-    }
+    const code = this.generate.verificationCode();
+    const expiry = this.generate.verificationCodeExpiry();
 
-    const verificationCode = this.opts.generateVerificationCode();
-    const verificationCodeExpiry = this.opts.generateVerificationCodeExpiry();
-
-    await this.db.userUpdateById(user._id, {
-      verification_code: verificationCode,
-      verification_code_expiry: verificationCodeExpiry,
+    await this.db.update({ _id: user._id }, {
+      verification_code: code,
+      verification_code_expiry: expiry,
     });
 
-    return {
-      verificationCode: verificationCode,
-      verificationCodeExpiry: verificationCodeExpiry,
-    };
+    return { code, expiry };
 
   }
 
-  emailVerificationComplete = async ({ login, verificationCode }: T.EzAuthEmailVerificationCompleteOpts): Promise<T.EzAuthEmailVerificationCompleteResult> => {
+  verificationComplete = async (opts: T.VerificationCompleteOpts): Promise<T.VerificationCompleteResult> => {
 
-    const user = await this.db.userFindByLogin(login);
+    const { type, code } = opts;
+
+    const query = this.queryFromOpts(opts);
+
+    const user = await this.db.find(query);
 
     if (!user) {
       throw { code: this.errors.user_not_found };
     }
 
     if (user.verification_code === null) {
-      throw { code: this.errors.user_verification_inactive };
+      throw { code: this.errors.verification_inactive };
     }
 
     if (user.verification_code_expiry === null || Date.now() > user.verification_code_expiry) {
-      throw { code: this.errors.user_verification_expired };
+      throw { code: this.errors.verification_expired };
     }
 
-    if (user.verification_code !== verificationCode) {
-      throw { code: this.errors.user_verification_incorrect };
+    if (user.verification_code !== code) {
+      throw { code: this.errors.verification_incorrect };
     }
 
-    await this.db.userUpdateById(user._id, {
-      verified: true,
+    const update: Partial<T.User> = {
       verification_code: null,
       verification_code_expiry: null,
-    });
-
-    return {
-      outcome: 0,
     };
 
+    if (type === "email") {
+      update.email_verified = true;
+    }
+    else if (type === "phone") {
+      update.phone_verified = true;
+    }
+
+    await this.db.update({ _id: user._id }, update);
+
+    return {};
+
   }
 
-  private tokenVerifyBasic = (token: string): T.EzAuthUser => {
-    return jwt.verify(token, this.opts.tokenSecretKey) as T.EzAuthUser;
+  private queryFromOpts = ({ _id, username, email, phone }: T.UserQuery) => {
+    return { _id, username, email, phone };
   }
 
-  private tokenGenerate = (user: T.EzAuthUserDB) => {
-    this.userMakeSafe(user);
-    return jwt.sign(user, this.opts.tokenSecretKey, {
+  private tokenVerifyBasic = (token: string): T.UserToken => {
+    return jwt.verify(token, this.opts.tokenSecretKey) as T.UserToken;
+  }
+
+  private tokenGenerate = (user: T.User): string => {
+    const data = this.userToTokenData(user);
+    return jwt.sign(data, this.opts.tokenSecretKey, {
       expiresIn: this.opts.tokenExpiry || "1h",
     });
   }
 
-  private userMakeSafe = (user: T.EzAuthUserDB): T.EzAuthUser => {
-    delete user.password;
-    delete user.login_code;
-    delete user.login_code_expiry;
-    return user;
+  private userToTokenData = (user: T.User): T.UserToken => {
+    const tokenData: T.UserToken = {
+      sub: user._id,
+      created: user.created,
+      auth_state: user.auth_state,
+      data: user.data,
+    };
+    if (user.username) {
+      tokenData.preferred_username = user.username;
+    }
+    if (user.email) {
+      tokenData.email = user.email;
+      tokenData.email_verified = user.email_verified || false;
+    }
+    if (user.phone) {
+      tokenData.phone_number = user.phone;
+      tokenData.phone_number_verified = user.phone_verified || false;
+    }
+    return tokenData;
   }
 
   private hashPassword = (password: string) => {

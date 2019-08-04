@@ -17,7 +17,8 @@
         "interface-name": false,
         "no-empty-interface": false,
         "no-implicit-dependencies": false,
-        "no-var-requires": false
+        "no-var-requires": false,
+        "no-submodule-imports": false
     },
     "rulesDirectory": []
 }

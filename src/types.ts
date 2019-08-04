@@ -1,27 +1,32 @@
 
-// BASE
-export interface EzAuthSuccess {
-  outcome: 0;
-}
-export interface EzAuthError {
-  outcome: 1;
-  error: string;
+// SCHEMA
+export type LoginTypes = "username" | "email" | "phone";
+
+interface UserData {
+  [key: string]: any;
 }
 
-// EZ AUTH DB
-export type LoginTypes = "username" | "email" | "phone";
-export interface EzAuthUser {
+export interface UserToken {
+  sub: string;
+  created: number;
+  auth_state: string;
+  preferred_username?: string;
+  email?: string;
+  email_verified?: boolean;
+  phone_number?: string;
+  phone_number_verified?: boolean;
+  data?: UserData;
+}
+
+export interface User {
   _id: string;
   created: number;
-  type: LoginTypes;
-  login: string; // username, email, phone
-  login_state: string;
-  verified: boolean;
-  profile: {
-    [key: string]: any;
-  };
-}
-export interface EzAuthUserDB extends EzAuthUser {
+  username?: string;
+  email?: string;
+  phone?: string;
+  email_verified?: boolean;
+  phone_verified?: boolean;
+  auth_state: string;
   login_code: string | null;
   login_code_expiry: number | null;
   password: string | null;
@@ -29,135 +34,144 @@ export interface EzAuthUserDB extends EzAuthUser {
   password_reset_code_expiry: number | null;
   verification_code: string | null;
   verification_code_expiry: number | null;
+  data?: UserData;
 }
 
-// EZ AUTH CONFIG
-
-export interface EzAuthDBAdapter {
-  userInsert: (user: EzAuthUserDB) => Promise<void>;
-  userFindById: (id: string) => Promise<EzAuthUserDB | null>;
-  userFindByLogin: (login: string) => Promise<EzAuthUserDB | null>;
-  userUpdateById: (id: string, update: Partial<EzAuthUserDB>) => Promise<void>;
-  userUpdateByLogin: (login: string, update: Partial<EzAuthUserDB>) => Promise<void>;
-  userRemove: (login: string) => Promise<void>;
+export interface UserQuery {
+  _id?: string;
+  username?: string;
+  email?: string;
+  phone?: string;
 }
 
-export interface EzAuthOptions {
+// CONFIG
+
+export interface DBAdapter {
+  insert: (user: User) => Promise<void>;
+  find: (query: UserQuery, checkAll?: boolean) => Promise<User | null>;
+  update: (query: UserQuery, update: Partial<User>) => Promise<void>;
+  remove: (query: UserQuery) => Promise<void>;
+}
+
+export interface Generators {
+  userId: () => string;
+  authState: () => string;
+  loginCode: () => string;
+  loginCodeExpiry: () => number;
+  passwordResetCode: () => string;
+  passwordResetCodeExpiry: () => number;
+  verificationCode: () => string;
+  verificationCodeExpiry: () => number;
+}
+
+export interface Options {
   tokenSecretKey: string;
   tokenExpiry?: number;
   passwordSaltRounds?: number;
-  generateId: () => string;
-  generateLoginState: () => string;
-  generateLoginCode: () => string;
-  generateLoginCodeExpiry: () => number;
-  generatePasswordResetCode: () => string;
-  generatePasswordExpiry: () => number;
-  generateVerificationCode: () => string;
-  generateVerificationCodeExpiry: () => number;
-  db: EzAuthDBAdapter;
+  generate?: Partial<Generators>;
+  sendLoginCode?: (user: User, code: string, expiry: number) => Promise<void>;
+  sendVerificationCode?: (user: User, code: string, expiry: number) => Promise<void>;
+  sendPasswordResetCode?: (user: User, code: string, expiry: number) => Promise<void>;
+  db: DBAdapter;
 }
 
-// EZ AUTH FUNCTIONS
+// FUNCTIONS
 
-export interface EzAuthRegisterOpts {
-  type: LoginTypes;
-  login: string;
+export interface RegisterOpts {
+  username?: string;
+  email?: string;
+  phone?: string;
+  email_verified?: boolean;
+  phone_verified?: boolean;
   password?: string;
-  profile?: EzAuthUser["profile"];
-  verified?: boolean;
+  data?: User["data"];
   generateVerificationCode?: boolean;
 }
-export interface EzAuthRegisterResult {
-  user: EzAuthUserDB;
+export interface RegisterResult {
+  user: User;
 }
 
-export interface EzAuthLoginPasswordOpts {
-  login: string;
+export interface LoginPasswordOpts extends UserQuery {
   password: string;
 }
-export interface EzAuthLoginPasswordResult {
+export interface LoginPasswordResult {
   token: string;
 }
 
-export interface EzAuthLoginEmailInitOpts {
-  login: string;
+export interface LoginEmailInitOpts extends UserQuery {
+  send?: boolean;
 }
-export interface EzAuthLoginEmailInitResult {
+export interface LoginEmailInitResult {
   loginCode: string;
   loginCodeExpiry: number;
 }
 
-export interface EzAuthLoginEmailCompleteOpts {
-  login: string;
+export interface LoginEmailCompleteOpts extends UserQuery {
   loginCode: string;
 }
-export interface EzAuthLoginEmailCompleteResult {
+export interface LoginEmailCompleteResult {
   token: string;
 }
 
-export interface EzAuthTokenVerifyOpts {
+export interface VerificationInitOpts extends UserQuery {
+  // send?: boolean;
+}
+export interface VerificationInitResult {
+  code: string;
+  expiry: number;
+}
+
+export interface VerificationCompleteOpts extends UserQuery {
+  type: "email" | "phone";
+  code: string;
+}
+export interface VerificationCompleteResult {}
+
+export interface TokenVerifyOpts {
   token: string;
 }
-export interface EzAuthTokenVerifyResult {
-  user: EzAuthUserDB;
+export interface TokenVerifyResult {
+  user: User;
+  decoded: UserToken;
 }
 
-export interface EzAuthTokenRevokeOpts {
-  login: string;
-}
-export interface EzAuthTokenRevokeResult {}
+export interface TokenRevokeOpts extends UserQuery {
 
-export interface EzAuthPasswordResetInitOpts {
-  login: string;
 }
-export interface EzAuthPasswordResetInitResult {
-  passwordResetCode: string;
-  passwordResetCodeExpiry: number;
+export interface TokenRevokeResult {}
+
+export interface PasswordResetInitOpts extends UserQuery {
+  send?: boolean;
+}
+export interface PasswordResetInitResult {
+  code: string;
+  expiry: number;
 }
 
-export interface EzAuthPasswordResetCompleteOpts {
-  login: string;
+export interface PasswordResetCompleteOpts extends UserQuery {
   password: string;
-  passwordResetCode: string;
+  code: string;
 }
-export interface EzAuthPasswordResetCompleteResult {}
+export interface PasswordResetCompleteResult {}
 
-export interface EzAuthUpdateLoginOpts {
-  login: string;
-  newLogin: string;
+export interface UpdateLoginOpts extends UserQuery {
+  newUsername?: string;
+  newEmail?: string;
+  newPhone?: string;
 }
-export interface EzAuthUpdateLoginResult {}
+export interface UpdateLoginResult {}
 
-export interface EzAuthUpdatePasswordOpts {
-  login: string;
+export interface UpdatePasswordOpts extends UserQuery {
   password: string;
 }
-export interface EzAuthUpdatePasswordResult {}
+export interface UpdatePasswordResult {}
 
-export interface EzAuthUpdateProfileOpts {
-  login: string;
-  profile: EzAuthUser["profile"];
+export interface UpdateDataOpts extends UserQuery {
+  data: User["data"];
 }
-export interface EzAuthUpdateProfileResult {
-  profile: EzAuthUser["profile"];
-}
-
-export interface EzAuthUserRemoveOpts {
-  login: string;
-}
-export interface EzAuthUserRemoveResult {}
-
-export interface EzAuthEmailVerificationInitOpts {
-  login: string;
+export interface UpdateDataResult {
+  data: User["data"];
 }
 
-export interface EzAuthEmailVerificationInitResult {
-  verificationCode: string;
-  verificationCodeExpiry: number;
-}
-
-export interface EzAuthEmailVerificationCompleteOpts {
-  login: string;
-  verificationCode: string;
-}
-export interface EzAuthEmailVerificationCompleteResult {}
+export interface UserRemoveOpts extends UserQuery {}
+export interface UserRemoveResult {}
