@@ -65,7 +65,9 @@ export interface Generators {
 }
 
 export interface Options {
+  tokenAlgorithm: string;
   tokenSecretKey: string;
+  tokenPublicKey?: string;
   tokenExpiry?: number;
   passwordSaltRounds?: number;
   generate?: Partial<Generators>;

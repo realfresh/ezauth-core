@@ -125,7 +125,7 @@ export class EzAuth {
       throw { code: this.errors.login_password_incorrect };
     }
 
-    const token = this.tokenGenerate(user);
+    const token = await this.tokenGenerate(user);
 
     return {
       token: token,
@@ -193,7 +193,7 @@ export class EzAuth {
       login_code_expiry: null,
     });
 
-    const token = this.tokenGenerate(user);
+    const token = await this.tokenGenerate(user);
 
     return {
       token: token,
@@ -205,7 +205,7 @@ export class EzAuth {
 
     let decoded;
     try {
-      decoded = this.tokenVerifyBasic(token);
+      decoded = await this.tokenVerifyBasic(token);
     }
     catch (e) {
       throw { code: this.errors.user_token_invalid };
@@ -433,15 +433,22 @@ export class EzAuth {
     return { _id, username, email, phone };
   }
 
-  private tokenVerifyBasic = (token: string): T.UserToken => {
-    return jwt.verify(token, this.opts.tokenSecretKey) as T.UserToken;
+  private tokenVerifyBasic = async (token: string): Promise<T.UserToken> => {
+    const verifyKey = this.opts.tokenPublicKey || this.opts.tokenSecretKey;
+    return jwt.verify(token, verifyKey, {
+      algorithms: [ this.opts.tokenAlgorithm ],
+    }) as T.UserToken;
   }
 
-  private tokenGenerate = (user: T.User): string => {
+  private tokenGenerate = async (user: T.User): Promise<string> => {
+
     const data = this.userToTokenData(user);
+
     return jwt.sign(data, this.opts.tokenSecretKey, {
       expiresIn: this.opts.tokenExpiry || "1h",
+      algorithm: this.opts.tokenAlgorithm,
     });
+
   }
 
   private userToTokenData = (user: T.User): T.UserToken => {

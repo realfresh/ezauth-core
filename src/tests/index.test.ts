@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import jwt from "jsonwebtoken";
 import faker from "faker";
 import nanoid from "nanoid";
@@ -8,7 +10,9 @@ require("dotenv").config({
   path: ".env.test",
 });
 
-const SECRET_KEY = "super-secret";
+const ES512_PRIVATE_KEY = fs.readFileSync(path.join(__dirname, "/../../keys/es512-private.pem"), "utf8");
+const ES512_PUBLIC_KEY = fs.readFileSync(path.join(__dirname, "/../../keys/es512-public.pem"), "utf8");
+const HMAC_SECRET_KEY = "super-secret";
 const MONGO_URL = process.env.MONGO_URL;
 const MONGO_DATABASE = process.env.MONGO_DATABASE;
 const MONGO_COLLECTION = process.env.MONGO_COLLECTION;
@@ -36,7 +40,9 @@ describe("EZAUTH TESTS", () => {
     const dbAdapter = await EzAuthMongoDBAdapter({ db, collection: MONGO_COLLECTION });
 
     auth = new EzAuth({
-      tokenSecretKey: SECRET_KEY,
+      tokenAlgorithm: "ES512", // "HS512",
+      tokenSecretKey: ES512_PRIVATE_KEY,
+      tokenPublicKey: ES512_PUBLIC_KEY,
       db: dbAdapter,
     });
 
