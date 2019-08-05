@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import * as T from "../types";
 import nanoid from "nanoid";
 
-export class EzAuth {
+export class EzAuth<UserExt extends T.User = T.User> {
 
   readonly errors = {
     update_login_already_exists: "update_login_already_exists",
@@ -31,11 +31,11 @@ export class EzAuth {
     verification_incorrect: "user_verification_incorrect",
     verification_expired: "user_verification_expired",
   };
-  readonly opts: T.Options;
+  readonly opts: T.Options<UserExt>;
   readonly generate: T.Generators;
-  readonly db: T.DBAdapter;
+  readonly db: T.DBAdapter<UserExt>;
 
-  constructor(opts: T.Options) {
+  constructor(opts: T.Options<UserExt>) {
 
     this.opts = opts;
     this.db = opts.db;
@@ -53,7 +53,7 @@ export class EzAuth {
 
   }
   
-  register = async (opts: T.RegisterOpts): Promise<T.RegisterResult> => {
+  register = async (opts: T.RegisterOpts): Promise<T.RegisterResult<UserExt>> => {
 
     const { username, email, phone } = opts;
 
@@ -95,10 +95,10 @@ export class EzAuth {
       user.verification_code_expiry = this.generate.verificationCodeExpiry();
     }
 
-    await this.db.insert(user);
+    const finalUser = await this.db.insert(user);
 
     return {
-      user: user,
+      user: finalUser,
     };
 
   }
@@ -201,7 +201,7 @@ export class EzAuth {
 
   }
 
-  tokenVerify = async ({ token }: T.TokenVerifyOpts): Promise<T.TokenVerifyResult> => {
+  tokenVerify = async ({ token }: T.TokenVerifyOpts): Promise<T.TokenVerifyResult<UserExt>> => {
 
     let decoded;
     try {

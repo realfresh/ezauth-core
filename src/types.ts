@@ -1,6 +1,5 @@
 
 // SCHEMA
-export type LoginTypes = "username" | "email" | "phone";
 
 interface UserData {
   [key: string]: any;
@@ -46,10 +45,10 @@ export interface UserQuery {
 
 // CONFIG
 
-export interface DBAdapter {
-  insert: (user: User) => Promise<void>;
-  find: (query: UserQuery, checkAll?: boolean) => Promise<User | null>;
-  update: (query: UserQuery, update: Partial<User>) => Promise<void>;
+export interface DBAdapter<UserExt extends User = User> {
+  insert: (user: User) => Promise<UserExt>;
+  find: (query: UserQuery, checkAll?: boolean) => Promise<UserExt | null>;
+  update: (query: UserQuery, update: Partial<User | UserExt>) => Promise<void>;
   remove: (query: UserQuery) => Promise<void>;
 }
 
@@ -64,17 +63,17 @@ export interface Generators {
   verificationCodeExpiry: () => number;
 }
 
-export interface Options {
+export interface Options<UserExt extends User = User> {
   tokenAlgorithm: string;
   tokenSecretKey: string;
   tokenPublicKey?: string;
   tokenExpiry?: number;
   passwordSaltRounds?: number;
   generate?: Partial<Generators>;
-  sendLoginCode?: (user: User, code: string, expiry: number) => Promise<void>;
-  sendVerificationCode?: (user: User, code: string, expiry: number) => Promise<void>;
-  sendPasswordResetCode?: (user: User, code: string, expiry: number) => Promise<void>;
-  db: DBAdapter;
+  sendLoginCode?: (user: UserExt, code: string, expiry: number) => Promise<void>;
+  sendVerificationCode?: (user: UserExt, code: string, expiry: number) => Promise<void>;
+  sendPasswordResetCode?: (user: UserExt, code: string, expiry: number) => Promise<void>;
+  db: DBAdapter<UserExt>;
 }
 
 // FUNCTIONS
@@ -89,8 +88,8 @@ export interface RegisterOpts {
   data?: User["data"];
   generateVerificationCode?: boolean;
 }
-export interface RegisterResult {
-  user: User;
+export interface RegisterResult<UserExt> {
+  user: UserExt;
 }
 
 export interface LoginPasswordOpts extends UserQuery {
@@ -132,8 +131,8 @@ export interface VerificationCompleteResult {}
 export interface TokenVerifyOpts {
   token: string;
 }
-export interface TokenVerifyResult {
-  user: User;
+export interface TokenVerifyResult<UserExt> {
+  user: UserExt;
   decoded: UserToken;
 }
 

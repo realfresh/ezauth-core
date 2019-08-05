@@ -46,7 +46,7 @@ function extractFilterFromQuery({ _id, username, email, phone }: UserQuery) {
 
 }
 
-export async function EzAuthMongoDBAdapter(opts: EzAuthMongoDBAdapterOptions): Promise<DBAdapter> {
+export async function EzAuthMongoDBAdapter<UserExt extends User = User>(opts: EzAuthMongoDBAdapterOptions): Promise<DBAdapter<UserExt>> {
 
   const { db } = opts;
 
@@ -55,6 +55,7 @@ export async function EzAuthMongoDBAdapter(opts: EzAuthMongoDBAdapterOptions): P
   return {
     insert: async (user) => {
       await collection.insertOne(user);
+      return user as UserExt;
     },
     find: async (query, checkAll) => {
       const { filter, orFilter } = extractFilterFromQuery(query);

@@ -5,6 +5,7 @@ import faker from "faker";
 import nanoid from "nanoid";
 import {Db, MongoClient} from "mongodb";
 import EzAuth, {EzAuthMongoDBAdapter} from "..";
+import {User} from "../types";
 
 require("dotenv").config({
   path: ".env.test",
@@ -17,6 +18,10 @@ const MONGO_URL = process.env.MONGO_URL;
 const MONGO_DATABASE = process.env.MONGO_DATABASE;
 const MONGO_COLLECTION = process.env.MONGO_COLLECTION;
 
+interface CustomUser extends User {
+  test_field: number;
+}
+
 describe("EZAUTH TESTS", () => {
 
   if (!MONGO_URL || !MONGO_DATABASE || !MONGO_COLLECTION) {
@@ -25,7 +30,7 @@ describe("EZAUTH TESTS", () => {
 
   let connection: MongoClient;
   let db: Db;
-  let auth: EzAuth;
+  let auth: EzAuth<CustomUser>;
 
   beforeAll(async () => {
 
@@ -37,7 +42,7 @@ describe("EZAUTH TESTS", () => {
     const users = db.collection(MONGO_COLLECTION);
     await users.deleteMany({});
 
-    const dbAdapter = await EzAuthMongoDBAdapter({ db, collection: MONGO_COLLECTION });
+    const dbAdapter = await EzAuthMongoDBAdapter<CustomUser>({ db, collection: MONGO_COLLECTION });
 
     auth = new EzAuth({
       tokenAlgorithm: "ES512", // "HS512",
